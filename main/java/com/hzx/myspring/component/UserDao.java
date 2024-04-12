@@ -1,6 +1,7 @@
 package com.hzx.myspring.component;
 
 import com.hzx.myspring.annotation.Component;
+import com.hzx.myspring.annotation.Scope;
 
 /**
  * @author Jools He
@@ -9,5 +10,6 @@ import com.hzx.myspring.annotation.Component;
  * @description: TODO
  */
 @Component
+@Scope("singleton")
 public class UserDao {
 }

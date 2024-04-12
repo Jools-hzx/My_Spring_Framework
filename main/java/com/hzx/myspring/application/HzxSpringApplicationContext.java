@@ -1,9 +1,15 @@
 package com.hzx.myspring.application;
 
+import com.hzx.myspring.annotation.Component;
 import com.hzx.myspring.annotation.ComponentScan;
+import com.hzx.myspring.annotation.Scope;
+import com.hzx.myspring.entity.BeanDefinition;
+import org.apache.commons.lang.StringUtils;
 
 import java.io.File;
 import java.net.URL;
+import java.util.Enumeration;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author Jools He
@@ -16,8 +22,45 @@ public class HzxSpringApplicationContext {
     //容器配置类的 Class 类对象
     Class<?> configClass;
 
+    private final ConcurrentHashMap<String, BeanDefinition> beanDefinitions = new ConcurrentHashMap<>();
+
+    private final ConcurrentHashMap<String, Object> singletonObjects = new ConcurrentHashMap<>();
+
     public HzxSpringApplicationContext(Class<?> configClass) {
         this.configClass = configClass;
+        scanPackageAndEncapsulateBeanDefinition(this.configClass);
+        injectSingleObjects();
+
+        System.out.println("容器初始化完成!");
+    }
+
+    private void injectSingleObjects() {
+        if (beanDefinitions.isEmpty()) return;  //检查集合情况
+        Enumeration<String> keys = beanDefinitions.keys();  //遍历集合
+        while (keys.hasMoreElements()) {
+            String beanId = keys.nextElement();
+            BeanDefinition beanDefinition = beanDefinitions.get(beanId);
+
+            //如果定义为 singleton 类型，则实例化并存放进集合内
+            if ("singleton".equals(beanDefinition.getScope())) {
+                Object instance = createBean(beanDefinition.getCls());
+                singletonObjects.put(beanId, instance);
+            }
+        }
+    }
+
+    // 该方法基于 Bean 类的 Class 类对象反射生成实例。
+    private Object createBean(Class<?> cls) {
+        Object instance;
+        try {
+            instance = cls.newInstance();
+        } catch (InstantiationException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+        return instance;
+    }
+
+    private void scanPackageAndEncapsulateBeanDefinition(Class<?> configClass) {
 
         if (configClass.isAnnotationPresent(ComponentScan.class)) {
 
@@ -52,12 +95,60 @@ public class HzxSpringApplicationContext {
                         absolutePath.lastIndexOf("\\") + 1,
                         absolutePath.indexOf("."));
                 System.out.println("类名:" + className);
-                String classFullPath = packagePath + className;
+                String classFullPath = packagePath + "." + className;
                 System.out.println("类的全路径:" + classFullPath);
-            }
 
+                try {
+                    Class<?> cls = Class.forName(classFullPath);
+                    String scope = "singleton"; //默认为 单例类型返回
+                    String beanId = StringUtils.uncapitalize(className);    //默认beanId为类名首字母小写
+
+                    //获取自定义的 beanId
+                    if (cls.isAnnotationPresent(Component.class)) {
+                        Component component = cls.getAnnotation(Component.class);
+                        if (isComponentAnnotationContainValue(component)) {
+                            beanId = component.value();
+                        }
+                    } else {
+                        //如果没有被注解 Component 标记，则不作为 bean 处理
+                        continue;
+                    }
+
+                    //获取自定义的 Scope
+                    if (cls.isAnnotationPresent(Scope.class)) {
+                        Scope scopeAnnotation = cls.getAnnotation(Scope.class);
+                        if (isScopeAnnotationContainValue(scopeAnnotation)) {
+                            scope = scopeAnnotation.value();
+                        }
+                    }
+
+                    //封装成 BeanDefinition 对象
+                    BeanDefinition beanDefinition = new BeanDefinition();
+                    beanDefinition.setBeanId(beanId);
+                    beanDefinition.setCls(cls);
+                    beanDefinition.setScope(scope);
+
+                    beanDefinitions.put(beanId, beanDefinition);
+
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException(e);
+                }
+            }
         } else {
             throw new RuntimeException("Can not find configuration class:" + configClass);
         }
     }
+
+    //判断 Component 注解value() 是否包含有值，并且值是否符合要求
+    private boolean isComponentAnnotationContainValue(Component component) {
+        return !component.value().isEmpty();
+    }
+
+    //判断 Scope 注解是否含有值并且符合输入要求
+    private boolean isScopeAnnotationContainValue(Scope scope) {
+        return !scope.value().isEmpty() &&
+                ("singleton".equals(scope.value()) ||
+                        "prototype".equals(scope.value()));
+    }
+
 }

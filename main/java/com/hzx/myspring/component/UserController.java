@@ -1,6 +1,7 @@
 package com.hzx.myspring.component;
 
 import com.hzx.myspring.annotation.Component;
+import com.hzx.myspring.annotation.Scope;
 
 /**
  * @author Jools He
@@ -10,5 +11,6 @@ import com.hzx.myspring.annotation.Component;
  */
 
 @Component
+@Scope(value = "prototype")
 public class UserController {
 }
