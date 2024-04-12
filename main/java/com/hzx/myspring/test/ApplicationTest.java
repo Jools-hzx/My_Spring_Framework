@@ -1,6 +1,7 @@
 package com.hzx.myspring.test;
 
 import com.hzx.myspring.application.HzxSpringApplicationContext;
+import com.hzx.myspring.component.UserDao;
 import com.hzx.myspring.config.HzxSpringConfig;
 
 /**
@@ -16,5 +17,12 @@ public class ApplicationTest {
         HzxSpringApplicationContext ioc = new HzxSpringApplicationContext(HzxSpringConfig.class);
 
         System.out.println("容器注入完成!");
+
+        Object bean = ioc.getBean("userDao");
+        UserDao userDao = ioc.getBean("userDao", UserDao.class);
+
+        System.out.println(bean);
+        System.out.println(userDao);
+        System.out.println(bean == userDao);
     }
 }

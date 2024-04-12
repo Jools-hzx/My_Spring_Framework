@@ -34,6 +34,31 @@ public class HzxSpringApplicationContext {
         System.out.println("容器初始化完成!");
     }
 
+    //根据 beanId 返回 Bean 对象
+    public Object getBean(String beanId) {
+        if (beanId.isEmpty()) return null;
+        //判断如果是单例，从单例集合中返回
+        BeanDefinition beanDefinition = beanDefinitions.get(beanId);
+        if ("singleton".equals(beanDefinition.getScope())
+                && singletonObjects.containsKey(beanId)) {
+            return singletonObjects.get(beanId);
+        }
+        //如果不是单例，则反射生成
+        if ("prototype".equals(beanDefinition.getScope())) {
+            return createBean(beanDefinition.getCls());
+        }
+        throw new RuntimeException("Can not find bean which beanId:" + beanId);
+    }
+
+    //根据 beanId 返回指定类型的 Bean 对象
+    public <T> T getBean(String beanId, Class<T> clazz) {
+        Object bean = getBean(beanId);
+        if (bean.getClass().isAssignableFrom(clazz)) {
+            return (T) bean;
+        }
+        throw new RuntimeException("Can not find bean which beanId:" + beanId);
+    }
+
     private void injectSingleObjects() {
         if (beanDefinitions.isEmpty()) return;  //检查集合情况
         Enumeration<String> keys = beanDefinitions.keys();  //遍历集合
