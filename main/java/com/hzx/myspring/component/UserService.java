@@ -1,5 +1,6 @@
 package com.hzx.myspring.component;
 
+import com.hzx.myspring.annotation.Autowired;
 import com.hzx.myspring.annotation.Component;
 import com.hzx.myspring.annotation.Scope;
 
@@ -13,4 +14,12 @@ import com.hzx.myspring.annotation.Scope;
 @Component
 @Scope
 public class UserService {
+
+    @Autowired(required = true)
+    private UserDao userDao;
+
+    public void m1() {
+        System.out.println("UserService 的 m1 方法被调用了...");
+        userDao.m1();
+    }
 }

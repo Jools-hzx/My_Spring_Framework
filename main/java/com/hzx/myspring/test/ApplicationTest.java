@@ -1,6 +1,7 @@
 package com.hzx.myspring.test;
 
 import com.hzx.myspring.application.HzxSpringApplicationContext;
+import com.hzx.myspring.component.UserController;
 import com.hzx.myspring.component.UserDao;
 import com.hzx.myspring.config.HzxSpringConfig;
 
@@ -18,11 +19,14 @@ public class ApplicationTest {
 
         System.out.println("容器注入完成!");
 
-        Object bean = ioc.getBean("userDao");
-        UserDao userDao = ioc.getBean("userDao", UserDao.class);
+        UserController bean = ioc.getBean("userController", UserController.class);
+        bean.m1();
 
-        System.out.println(bean);
-        System.out.println(userDao);
-        System.out.println(bean == userDao);
+//        Object bean = ioc.getBean("userDao");
+//        UserDao userDao = ioc.getBean("userDao", UserDao.class);
+//
+//        System.out.println(bean);
+//        System.out.println(userDao);
+//        System.out.println(bean == userDao);
     }
 }

@@ -1,5 +1,6 @@
 package com.hzx.myspring.component;
 
+import com.hzx.myspring.annotation.Autowired;
 import com.hzx.myspring.annotation.Component;
 import com.hzx.myspring.annotation.Scope;
 
@@ -13,4 +14,12 @@ import com.hzx.myspring.annotation.Scope;
 @Component
 @Scope(value = "prototype")
 public class UserController {
+
+    @Autowired
+    private UserService userService;
+
+    public void m1() {
+        System.out.println("UserController 的 m1 方法被调用了....");
+        userService.m1();
+    }
 }

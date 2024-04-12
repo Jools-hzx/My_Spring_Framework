@@ -1,5 +1,6 @@
 package com.hzx.myspring.application;
 
+import com.hzx.myspring.annotation.Autowired;
 import com.hzx.myspring.annotation.Component;
 import com.hzx.myspring.annotation.ComponentScan;
 import com.hzx.myspring.annotation.Scope;
@@ -7,6 +8,7 @@ import com.hzx.myspring.entity.BeanDefinition;
 import org.apache.commons.lang.StringUtils;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.net.URL;
 import java.util.Enumeration;
 import java.util.concurrent.ConcurrentHashMap;
@@ -51,6 +53,7 @@ public class HzxSpringApplicationContext {
     }
 
     //根据 beanId 返回指定类型的 Bean 对象
+    @SuppressWarnings("all")
     public <T> T getBean(String beanId, Class<T> clazz) {
         Object bean = getBean(beanId);
         if (bean.getClass().isAssignableFrom(clazz)) {
@@ -79,12 +82,46 @@ public class HzxSpringApplicationContext {
         Object instance;
         try {
             instance = cls.newInstance();
+
+            //If AutoWired Annotation exists, try to auto wired field by specifics bean
+            Field[] fields = cls.getDeclaredFields();
+            for (Field field : fields) {
+                if (field.isAnnotationPresent(Autowired.class)) {
+
+                    Autowired autowired = field.getAnnotation(Autowired.class);
+                    String fieldName = field.getName();
+                    Object autoWiredInstance = null;
+                    field.setAccessible(true);
+
+                    //If bean definition is defined and scope is "singleton"
+                    if (beanDefinitions.containsKey(fieldName) &&
+                            "singleton".equals(beanDefinitions.get(fieldName).getScope())) {
+                        if (singletonObjects.containsKey(fieldName)) {
+                            autoWiredInstance = singletonObjects.get(fieldName);
+                        } else {
+                            autoWiredInstance = createBean(beanDefinitions.get(fieldName).getCls());
+                            singletonObjects.put(fieldName, autoWiredInstance);
+                        }
+                    }
+
+                    // Throw Exception if autoWired is required!!!
+                    if (null == autoWiredInstance && autowired.required()) {
+                        throw new RuntimeException("Not assemblable bean instance, " +
+                                "please check field name:" + fieldName);
+                    }
+
+                    //set the field
+                    field.set(instance, autoWiredInstance);
+                    field.setAccessible(false);
+                }
+            }
         } catch (InstantiationException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
         return instance;
     }
 
+    @SuppressWarnings("all")
     private void scanPackageAndEncapsulateBeanDefinition(Class<?> configClass) {
 
         if (configClass.isAnnotationPresent(ComponentScan.class)) {

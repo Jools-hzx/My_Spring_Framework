@@ -12,4 +12,8 @@ import com.hzx.myspring.annotation.Scope;
 @Component
 @Scope("singleton")
 public class UserDao {
+
+    public void m1() {
+        System.out.println("UserDao 的 m1 方法被调用了....");
+    }
 }
