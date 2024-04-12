@@ -2,8 +2,9 @@ package com.hzx.myspring.test;
 
 import com.hzx.myspring.application.HzxSpringApplicationContext;
 import com.hzx.myspring.component.UserController;
-import com.hzx.myspring.component.UserDao;
 import com.hzx.myspring.config.HzxSpringConfig;
+import com.hzx.myspring.interface_.UsbInterface;
+
 
 /**
  * @author Jools He
@@ -17,6 +18,13 @@ public class ApplicationTest {
 
         HzxSpringApplicationContext ioc = new HzxSpringApplicationContext(HzxSpringConfig.class);
 
+        UsbInterface camera = (UsbInterface) ioc.getBean("camera");
+        camera.transferImages();
+
+        UserController controller = ioc.getBean("userController", UserController.class);
+        controller.m1();
+
+        camera.transferImages();
 
 //        UserController bean = ioc.getBean("userController", UserController.class);
 //        bean.m1();
