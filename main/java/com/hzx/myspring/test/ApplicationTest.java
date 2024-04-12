@@ -17,10 +17,9 @@ public class ApplicationTest {
 
         HzxSpringApplicationContext ioc = new HzxSpringApplicationContext(HzxSpringConfig.class);
 
-        System.out.println("容器注入完成!");
 
-        UserController bean = ioc.getBean("userController", UserController.class);
-        bean.m1();
+//        UserController bean = ioc.getBean("userController", UserController.class);
+//        bean.m1();
 
 //        Object bean = ioc.getBean("userDao");
 //        UserDao userDao = ioc.getBean("userDao", UserDao.class);

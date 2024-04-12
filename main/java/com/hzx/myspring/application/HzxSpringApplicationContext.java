@@ -5,12 +5,16 @@ import com.hzx.myspring.annotation.Component;
 import com.hzx.myspring.annotation.ComponentScan;
 import com.hzx.myspring.annotation.Scope;
 import com.hzx.myspring.entity.BeanDefinition;
+import com.hzx.myspring.interface_.BeanPostProcessor;
+import com.hzx.myspring.interface_.InitializingBean;
 import org.apache.commons.lang.StringUtils;
 
 import java.io.File;
 import java.lang.reflect.Field;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -27,13 +31,12 @@ public class HzxSpringApplicationContext {
     private final ConcurrentHashMap<String, BeanDefinition> beanDefinitions = new ConcurrentHashMap<>();
 
     private final ConcurrentHashMap<String, Object> singletonObjects = new ConcurrentHashMap<>();
+    private final List<BeanPostProcessor> postProcessors = new ArrayList<>();
 
     public HzxSpringApplicationContext(Class<?> configClass) {
         this.configClass = configClass;
         scanPackageAndEncapsulateBeanDefinition(this.configClass);
         injectSingleObjects();
-
-        System.out.println("容器初始化完成!");
     }
 
     //根据 beanId 返回 Bean 对象
@@ -47,7 +50,7 @@ public class HzxSpringApplicationContext {
         }
         //如果不是单例，则反射生成
         if ("prototype".equals(beanDefinition.getScope())) {
-            return createBean(beanDefinition.getCls());
+            return createBean(beanDefinition.getBeanId(), beanDefinition.getCls());
         }
         throw new RuntimeException("Can not find bean which beanId:" + beanId);
     }
@@ -71,54 +74,82 @@ public class HzxSpringApplicationContext {
 
             //如果定义为 singleton 类型，则实例化并存放进集合内
             if ("singleton".equals(beanDefinition.getScope())) {
-                Object instance = createBean(beanDefinition.getCls());
+                Object instance = createBean(
+                        beanDefinition.getBeanId(),
+                        beanDefinition.getCls());
                 singletonObjects.put(beanId, instance);
             }
         }
     }
 
     // 该方法基于 Bean 类的 Class 类对象反射生成实例。
-    private Object createBean(Class<?> cls) {
+    private Object createBean(String beanId, Class<?> cls) {
         Object instance;
         try {
             instance = cls.newInstance();
+            executeAutoWired(instance, cls);
 
-            //If AutoWired Annotation exists, try to auto wired field by specifics bean
-            Field[] fields = cls.getDeclaredFields();
-            for (Field field : fields) {
-                if (field.isAnnotationPresent(Autowired.class)) {
-
-                    Autowired autowired = field.getAnnotation(Autowired.class);
-                    String fieldName = field.getName();
-                    Object autoWiredInstance = null;
-                    field.setAccessible(true);
-
-                    //If bean definition is defined and scope is "singleton"
-                    if (beanDefinitions.containsKey(fieldName) &&
-                            "singleton".equals(beanDefinitions.get(fieldName).getScope())) {
-                        if (singletonObjects.containsKey(fieldName)) {
-                            autoWiredInstance = singletonObjects.get(fieldName);
-                        } else {
-                            autoWiredInstance = createBean(beanDefinitions.get(fieldName).getCls());
-                            singletonObjects.put(fieldName, autoWiredInstance);
-                        }
-                    }
-
-                    // Throw Exception if autoWired is required!!!
-                    if (null == autoWiredInstance && autowired.required()) {
-                        throw new RuntimeException("Not assemblable bean instance, " +
-                                "please check field name:" + fieldName);
-                    }
-
-                    //set the field
-                    field.set(instance, autoWiredInstance);
-                    field.setAccessible(false);
+            //Invoke all the postProcessBeforeInitialization methods before bean is initializing
+            if (!postProcessors.isEmpty()) {
+                for (BeanPostProcessor processor : postProcessors) {
+                    instance = processor.postProcessBeforeInitialization(instance, beanId);
                 }
             }
-        } catch (InstantiationException | IllegalAccessException e) {
+
+            //Using mark Interface to show bean is initialized
+            if (InitializingBean.class.isAssignableFrom(instance.getClass())) {
+                ((InitializingBean) instance).afterPropertiesSet();
+            }
+
+            //Invoke all the postProcessAfterInitialization methods before bean is initializing
+            if (!postProcessors.isEmpty()) {
+                for (BeanPostProcessor processor : postProcessors) {
+                    instance = processor.postProcessAfterInitialization(instance, beanId);
+                }
+            }
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
         return instance;
+    }
+
+    //Finish Autowired function
+    private void executeAutoWired(Object instance, Class<?> cls) throws IllegalAccessException {
+
+        //If AutoWired Annotation exists, try to auto wired field by specifics bean
+        Field[] fields = cls.getDeclaredFields();
+        for (Field field : fields) {
+            if (field.isAnnotationPresent(Autowired.class)) {
+
+                Autowired autowired = field.getAnnotation(Autowired.class);
+                String fieldName = field.getName();
+                Object autoWiredInstance = null;
+                field.setAccessible(true);
+
+                //If bean definition is defined and scope is "singleton"
+                if (beanDefinitions.containsKey(fieldName) &&
+                        "singleton".equals(beanDefinitions.get(fieldName).getScope())) {
+                    if (singletonObjects.containsKey(fieldName)) {
+                        autoWiredInstance = singletonObjects.get(fieldName);
+                    } else {
+                        autoWiredInstance = createBean(
+                                beanDefinitions.get(fieldName).getBeanId(),
+                                beanDefinitions.get(fieldName).getCls());
+                        singletonObjects.put(fieldName, autoWiredInstance);
+                    }
+                }
+
+                // Throw Exception if autoWired is required!!!
+                if (null == autoWiredInstance && autowired.required()) {
+                    throw new RuntimeException("Not assemblable bean instance, " +
+                            "please check field name:" + fieldName);
+                }
+
+                //set the field
+                field.set(instance, autoWiredInstance);
+                field.setAccessible(false);
+            }
+        }
     }
 
     @SuppressWarnings("all")
@@ -128,7 +159,7 @@ public class HzxSpringApplicationContext {
 
             ComponentScan componentScan = configClass.getAnnotation(ComponentScan.class);
             String packagePath = componentScan.value();
-            System.out.println("待扫描的包路径为:" + packagePath);
+//            System.out.println("待扫描的包路径为:" + packagePath);
             //拼接字符串
             StringBuilder sb = new StringBuilder();
 
@@ -156,9 +187,9 @@ public class HzxSpringApplicationContext {
                 String className = absolutePath.substring(
                         absolutePath.lastIndexOf("\\") + 1,
                         absolutePath.indexOf("."));
-                System.out.println("类名:" + className);
+//                System.out.println("类名:" + className);
                 String classFullPath = packagePath + "." + className;
-                System.out.println("类的全路径:" + classFullPath);
+//                System.out.println("类的全路径:" + classFullPath);
 
                 try {
                     Class<?> cls = Class.forName(classFullPath);
@@ -173,6 +204,14 @@ public class HzxSpringApplicationContext {
                         }
                     } else {
                         //如果没有被注解 Component 标记，则不作为 bean 处理
+                        continue;
+                    }
+
+                    //将所有的 BeanPostProcessor 对象实例化并且存放到集合内
+                    if (BeanPostProcessor.class.isAssignableFrom(cls)) {
+                        System.out.println("检测到 Bean 后置处理器:" + beanId);
+                        Object processor = cls.newInstance();
+                        postProcessors.add((BeanPostProcessor) processor);
                         continue;
                     }
 
@@ -191,8 +230,7 @@ public class HzxSpringApplicationContext {
                     beanDefinition.setScope(scope);
 
                     beanDefinitions.put(beanId, beanDefinition);
-
-                } catch (ClassNotFoundException e) {
+                } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
             }

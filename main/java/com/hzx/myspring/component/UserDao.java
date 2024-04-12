@@ -2,6 +2,7 @@ package com.hzx.myspring.component;
 
 import com.hzx.myspring.annotation.Component;
 import com.hzx.myspring.annotation.Scope;
+import com.hzx.myspring.interface_.InitializingBean;
 
 /**
  * @author Jools He
@@ -11,9 +12,14 @@ import com.hzx.myspring.annotation.Scope;
  */
 @Component
 @Scope("singleton")
-public class UserDao {
+public class UserDao implements InitializingBean {
 
     public void m1() {
         System.out.println("UserDao 的 m1 方法被调用了....");
+    }
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        System.out.println("UserDao 对象被初始化.....");
     }
 }
